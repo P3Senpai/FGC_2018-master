@@ -31,11 +31,13 @@ package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.hardware.ColorSensor;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.TouchSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
+import java.util.concurrent.TimeUnit;
 
 /**
  * This file contains an example of an iterative (Non-Linear) "OpMode".
@@ -68,11 +70,14 @@ public class TeleOp extends OpMode
     private ElapsedTime runtime = new ElapsedTime();
     private DcMotor leftDrive = null;
     private DcMotor rightDrive = null;
+    private DcMotor strafeDrive = null;
     private DcMotor liftMotor = null;
-    //private DcMotor armMotor = null;
+    private DcMotor armMotor = null;
     private Servo armLeftServo = null;
     private Servo armRightServo = null;
     private Servo armMainServo = null;
+    private ColorSensor middleBar = null;
+    private  ColorSensor bottomBar = null;
     //private TouchSensor touchSensor = null;
 
     //Fields for setting power
@@ -84,31 +89,35 @@ public class TeleOp extends OpMode
      */
     @Override
     public void init() {
-        telemetry.addData("Status", "Initialized");
+        telemetry.addData("Status", "Initializing ...");
 
-        // Initialize the hardware variables. Note that the strings used here as parameters
-        // to 'get' must correspond to the names assigned during the robot configuration
-        // step (using the FTC Robot Controller app on the phone).
         leftDrive  = hardwareMap.get(DcMotor.class, "left_drive");
         rightDrive = hardwareMap.get(DcMotor.class, "right_drive");
+       // strafeDrive = hardwareMap.get(DcMotor.class, "strafe_drive");
         liftMotor = hardwareMap.get(DcMotor.class, "lift_motor");
-        //armMotor = hardwareMap.get(DcMotor.class, "arm_motor");
+        armMotor = hardwareMap.get(DcMotor.class, "arm_motor");
         armRightServo = hardwareMap.get(Servo.class, "arm_right_servo");
         armLeftServo = hardwareMap.get(Servo.class, "arm_left_servo");
-        //touchSensor = hardwareMap.get(TouchSensor.class, "touch_sensor");
         armMainServo = hardwareMap.get(Servo.class, "arm_main_servo");
+        //touchSensor = hardwareMap.get(TouchSensor.class, "touch_sensor");
+//        middleBar   = hardwareMap.get(ColorSensor.class, "middle");
+//        bottomBar   = hardwareMap.get(ColorSensor.class, "bottom");
 
-        // Most robots need the motor on one side to be reversed to drive forward
-        // Reverse the motor that runs backwards when connected directly to the battery
+
         leftDrive.setDirection(DcMotor.Direction.FORWARD);
         rightDrive.setDirection(DcMotor.Direction.REVERSE);
+
+        liftMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        liftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+        armMainServo.scaleRange( -0.5, 1.0);
+        armMainServo.setPosition(0.0);
+        armLeftServo.setPosition(0);
+        armRightServo.setPosition(0);
 
         // Tell the driver that initialization is complete.
         telemetry.addData("Status", "Initialized");
 
-        armMainServo.setPosition(0);
-        armLeftServo.setPosition(0);
-        armRightServo.setPosition(0);
     }
 
     /*
@@ -137,25 +146,34 @@ public class TeleOp extends OpMode
         // Setup a variable for each drive wheel to save power level for telemetry
         double leftPower;
         double rightPower;
+        double horizontalPower;
 
         // Choose to drive using either Tank Mode, or POV Mode
         // Comment out the method that's not used.  The default below is POV.
 
         // POV Mode uses left stick to go forward, and right stick to turn.
         // - This uses basic math to combine motions and is easier to drive straight.
-        double drive = -gamepad1.left_stick_y;
+        double drive =  gamepad1.left_stick_y;
+        double strafe = gamepad1.left_stick_x;
         double turn  =  gamepad1.right_stick_x;
+
         leftPower    = Range.clip(drive + turn, -1.0, 1.0) ;
         rightPower   = Range.clip(drive - turn, -1.0, 1.0) ;
-
-        // Tank Mode uses one stick to control each wheel.
-        // - This requires no math, but it is hard to drive forward slowly and keep straight.
-        // leftPower  = -gamepad1.left_stick_y ;
-        // rightPower = -gamepad1.right_stick_y ;
+        horizontalPower = Range.clip( drive + strafe, -1.0,1.0);
 
         // Send calculated power to wheels
-        leftDrive.setPower(leftPower);
-        rightDrive.setPower(rightPower);
+
+        // Normal Speed
+        leftDrive.setPower(leftPower * 0.4);
+        rightDrive.setPower(rightPower * 0.4);
+//        strafeDrive.setPower(horizontalPower * 0.4);
+
+        // Turbo Speed
+        if (gamepad1.left_stick_button){
+            leftDrive.setPower(leftPower * 0.9);
+            rightDrive.setPower(rightPower * 0.9);
+  //          strafeDrive.setPower(horizontalPower * 0.9);
+        }
 
         //endregion
 
@@ -181,19 +199,19 @@ public class TeleOp extends OpMode
 
         //region armMotor --> not in use
 
-        //if(gamepad1.a && gamepad1.dpad_up){
-            //armMotor.setPower(MOTOR_MAX);
-        //}
-        //else if(gamepad1.a && gamepad1.dpad_down){
-            //armMotor.setPower(-MOTOR_MAX);
-        //}
-       // else{
-            //armMotor.setPower(MOTOR_OFF);
-        //}
+        if(gamepad1.a && gamepad1.dpad_up){
+            armMotor.setPower(MOTOR_MAX);
+        }
+        else if(gamepad1.a && gamepad1.dpad_down){
+            armMotor.setPower(-MOTOR_MAX);
+        }
+        else{
+            armMotor.setPower(MOTOR_OFF);
+        }
 
         //endregion
 
-        //region armServoMotors
+        //region gripServoMotors
 
         double leftServoPosition = armLeftServo.getPosition();
         double rightServoPosition = armRightServo.getPosition();
@@ -206,38 +224,39 @@ public class TeleOp extends OpMode
             leftServoPosition -= 0.1;
             rightServoPosition += 0.1;
         }
-        else {
-
+        else if(gamepad1.a && (!gamepad1.dpad_up || !gamepad1.dpad_down)) {
+            automatedServoPlacement();
         }
+
         armRightServo.setPosition(rightServoPosition);
         armLeftServo.setPosition(leftServoPosition);
 
         //endregion
 
         //region mainServoMotor
+        double servoSpeed = gamepad1.right_stick_y;
 
         double mainServoPosition = armMainServo.getPosition();
+        armMainServo.setPosition(servoContinuousMotion(servoSpeed, mainServoPosition));
 
-        if(gamepad1.right_bumper){
-            mainServoPosition += 0.1;
-        }
-        else if(gamepad1.left_bumper){
-            mainServoPosition -= 0.1;
-        }
-        else {
 
-        }
-        armMainServo.setPosition(mainServoPosition);
+    /* Petr: We can now control the main servo using the right joystick */
+//        if(gamepad1.right_bumper){
+//            mainServoPosition += 0.1;
+//        }
+//        else if(gamepad1.left_bumper){
+//            mainServoPosition -= 0.1;
+//        }
+//        else {
+//
+//        }
 
         //endregion
 
         // Show the elapsed game time and wheel power.
         telemetry.addData("Status", "Run Time: " + runtime.toString());
-        telemetry.addData("Motors", "left (%.2f), right (%.2f)", leftPower, rightPower);
-        telemetry.addData("liftMotor", "Height: " + liftMotor.getCurrentPosition());
-        telemetry.addData("armLeftServo", "position: " + leftServoPosition);
-        telemetry.addData("armRightServo", "position: " + rightServoPosition);
-        telemetry.addData("armMainServo", "position" + mainServoPosition);
+        telemetry.addData("Motors", "left (%.2f), right (%.2f), horizontal (%.2f)", leftPower, rightPower, horizontalPower);
+        telemetry.addData("Servos", "left (%.2f), right (%.2f), main_arm (%.4f)", leftServoPosition, rightServoPosition, mainServoPosition);
         //telemetry.addData("cageMotor", "Position: " + cageMotor.getCurrentPosition());
     }
 
@@ -246,6 +265,42 @@ public class TeleOp extends OpMode
      */
     @Override
     public void stop() {
+    }
+
+    public void automatedServoPlacement (){
+        /* HOW IT WILL WORK
+        * 1. if sensors bottom and middle are active then place block on top
+         * 2. if bottom sensor is active but middle is not then place block in the middle slot
+         * 3. If both sensors are inactive then put on the bottom slot
+        * */
+    }
+
+    private double servoContinuousMotion (double servoSpeed, double servoMovingPosition) {
+
+        if (servoSpeed > 0.05){
+            servoMovingPosition = servoSpeed * 0.006;
+        } else if (-0.05 > servoSpeed){
+            servoMovingPosition = servoSpeed * 0.006;
+        }
+        return servoMovingPosition;
+    }
+
+    private void flipAndDropOff(){
+        // Stage 1 move hand into compartment
+        armMainServo.setPosition(-0.5);
+
+        // Stage 2 open grip
+        if (armMainServo.getPosition() == -0.5) {
+            double leftServoPosition = armLeftServo.getPosition();
+            double rightServoPosition = armRightServo.getPosition();
+            leftServoPosition -= 0.1;
+            rightServoPosition += 0.1;
+            armRightServo.setPosition(rightServoPosition);
+            armLeftServo.setPosition(leftServoPosition);
+        }
+
+        //Stage 3 return hand
+        armMainServo.setPosition(0.0);
     }
 
 }
